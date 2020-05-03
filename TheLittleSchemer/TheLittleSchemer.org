@@ -1,0 +1,881 @@
+#+TITLE: The Little Schemer
+#+SUBTITLE: 递归与函数式的奥妙
+
+* 概要
+:BOOK:
+:AUTHOR: [美] Dainel P. Friedman; Matthias Felleisen
+:PUBLISHER: 中国工信出版集团; 电子工业出版社
+:Origin: The Little Schemer - Fourth Edition
+:Publish_At: 2017
+:Douban: [[https://book.douban.com/subject/27080946/][https://book.douban.com/subject/27080946/]]
+:END:
+
+* 笔记
+** 序
+要让构图更具创造性，必须首先具备驾驭工具的能力。甚至在能力具备之前都不要去构图如
+何组织一张好照片。同样，未深入理解如何“预先视觉化”编程生成的工序，则无法构造出卓
+越的计算机系统。
+
+编程需要选择秤心的语言，魔法编程语言Lisp属于崇尚自由和灵活风格的程序员！在Lisp的
+世界里，程序是一等数据，以参数方式传递，以值的方式返回，并存储在数据结构中。
+** 前言
+程序接受数据并产生数据。程序设计需要彻底理解数据：好的程序会反映出所处理数据的结
+构。大多数的数据集合，并由此延伸到大多数数据，都是可递归表示的。递归是依据自身定
+义对象或解决问题的方法。
+
+*本书的目标是引导读者学习递归思维模式。* 编程语言是表达递归概念的最佳方式。编程
+ 语言像数学那样，具备将形式化含义赋予一系列符号的能力。但又不同于数学，可以直接
+ 体验编程语言——可以运行程序，观察其行为，然后修改它，再看看修改结果。
+
+本书引入的三个函数 =atom?=, =sub1=, =add1=:
+
+ #+BEGIN_SRC scheme
+(define atom?
+  (lambda (x)
+    (and (not (pair? x)) (not (null? x)))))
+(atom? 'a)
+
+ #+END_SRC
+
+** Scheme十诫
+- 第一戒
+
+  当对一个原子列表lat进行递归调用时，询问两个有关lat的问题： =(null? lat)= 和
+  =else= 。
+
+  当对一个数字n进行递归调用时，询问两个有关n的问题： =(zero? n)= 和 =else= 。
+
+  当对一个S-表达式列表l进行递归调用时，询问三个有关l的问题： =(null? lat)=,
+  =(atom? (car 1))= 和 =else= 。
+
+- 第二戒
+
+  使用cons来构建列表
+
+- 第三戒
+
+  构建一个列表的时候，描述第一个典型元素，之后 =cons= 该元素到一般性递归(natural
+  recursion)上。
+
+- 第四戒
+
+  在递归时总是改变至少一个参数。该参数必须向着不断接近结束条件而改变。改变的参数
+  必须在结束条件中得以测试：当使用 =cdr= 时，用 =null?= 测试是否结束。
+
+- 第五戒
+
+  当用+构建一个值时，总是使用0作为结束代码行的值，因为加上0不会改变加法的值。
+
+  当用X构建一个值时，总是使用1作为结束代码行的值，因为乘以1不会改变乘法的值。
+
+  当用cons构建一个值时，总是考虑把()作为结束代码行的值。
+
+
+
+** Scheme五法
+- Scheme五法之第一法 —— car之法则
+  基本元件 =car= 仅定义为针对非空列表
+- Scheme五法之第二法 —— cdr之法则
+  基本元件 =cdr= 仅定义为针对非空列表。任意非空列表的cdr总是另一个列表。
+- Scheme五法之第三法 —— cons之法则
+  基本元件 =cons= 需要两个参数。第二个参数必须是一个列表。结果是一个列表
+- Scheme五法之第四法 —— null?之法则
+  基本元件 =null?= 仅定义为针对列表
+- Scheme五法之第五法 —— eq?之法则
+  基本元件 =eq?= 需要两个参数，每个参数都必须是一个非数字的原子
+
+** 第一章 玩具总动员
+car, cdr, cons, null? eq?
+
+** 第二章 处理，处理，反复处理……
+
+#+BEGIN_SRC scheme
+(define atom?
+  (lambda (x)
+    (and (not (pair? x)) (not (null? x)))))
+
+(define lat?
+  (lambda (l)
+    (cond
+     ((null? l) #t)
+     ((atom? (car l))(lat? (cdr l)))
+     (else #f))))
+
+(lat? '(Jack Spart could eat no chicken fat))
+
+(define member?
+  (lambda (a lat)
+    (cond
+     ((null? lat) #f)
+     (else (or (eq? a (car lat))
+            (member? a (cdr lat)))))))
+(member? 'a '(d b a c))
+#+END_SRC
+
+#+RESULTS:
+: #t
+
+** 第三章 用cons构建恢宏
+
+
+#+BEGIN_SRC scheme
+(define rember
+  (lambda (a lat)
+    (cond [(null? lat) '()]
+          [(eq? a (car lat)) (cdr lat)]
+          [else (cons (car lat)
+                      (rember a
+                              (cdr lat)))])))
+
+(rember 'a '(c b a d))
+#+END_SRC
+
+#+RESULTS:
+| c | b | d |
+
+
+#+BEGIN_SRC scheme
+(define insertR
+  (lambda (new old lat)
+    (cond
+     ((null? lat) '())
+     (else
+      (cond
+       [(eq? old (car lat))
+        (cons old
+              (cons new
+                    (cdr lat)))]
+       [else (cons (car lat)
+                   (insertR new old (cdr lat)))])))))
+
+(insertR 'd 'b '(a b c d))
+
+#+END_SRC
+
+#+RESULTS:
+| a | b | d | c | d |
+
+
+#+BEGIN_SRC scheme
+
+(define insertL
+  (lambda (new old lat)
+    (cond
+     ((null? lat) '())
+     (else
+      (cond
+       [(eq? old (car lat))
+        (cons new lat)]
+       [else (cons (car lat)
+                   (insertL new old (cdr lat)))])))))
+
+(insertL 'd 'b '(a b c d))
+#+END_SRC
+
+#+RESULTS:
+| a | d | b | c | d |
+
+
+#+BEGIN_SRC scheme
+(define subst
+  (lambda (new old lat)
+    (cond
+     ((null? lat) '())
+     (else
+      (cond
+       [(eq? old (car lat))
+        (cons new
+              (cdr lat))]
+       [else (cons (car lat)
+                   (subst new old (cdr lat)))])))))
+
+(subst 'd 'b '(a b c d))
+#+END_SRC
+
+#+RESULTS:
+| a | d | c | d |
+
+
+#+BEGIN_SRC scheme
+(define subst2
+  (lambda (new o1 o2 lat)
+    (cond
+     [(null? lat) '()]
+     [(or (eq? o1 (car lat))
+          (eq? o2 (car lat)))
+      (cons new
+            (cdr lat))]
+     [else (cons (car lat)
+                 (subst2 new o1 o2 (cdr lat)))])))
+
+(subst2 'a 'd 'c '(a b c d))
+#+END_SRC
+
+#+RESULTS:
+| a | b | a | d |
+
+
+#+BEGIN_SRC scheme
+(define multirember
+  (lambda (a lat)
+    (cond
+     [(null? lat) '()]
+     [(eq? a (car lat)) (multirember a
+                                     (cdr lat))]
+     [else (cons (car lat)
+                 (multirember a
+                              (cdr lat)))])))
+
+(multirember 'b '(a b a b a b))
+#+END_SRC
+
+#+RESULTS:
+| a | a | a |
+
+
+#+BEGIN_SRC scheme
+(define multiinsertR
+  (lambda (new old lat)
+    (cond
+     [(null? lat) '()]
+     [(eq? old (car lat)) (cons old
+                                (cons new
+                                      (multiinsertR new old (cdr lat))))]
+     [else (cons (car lat)
+                 (multiinsertR new old (cdr lat)))])))
+
+(multiinsertR 'j 'b '(a b c b a b))
+#+END_SRC
+
+#+RESULTS:
+| a | b | j | c | b | j | a | b | j |
+
+
+#+BEGIN_SRC scheme
+(define multiinsertL
+  (lambda (new old lat)
+    (cond
+     [(null? lat) '()]
+     [(eq? old (car lat)) (cons new
+                                (cons old
+                                      (multiinsertL new old (cdr lat))))]
+     [else (cons (car lat)
+                 (multiinsertL new old (cdr lat)))])))
+
+(multiinsertL 'j 'b '(a b c b a b))
+#+END_SRC
+
+#+RESULTS:
+| a | j | b | c | j | b | a | j | b |
+
+#+BEGIN_SRC scheme
+(define multisubst
+  (lambda (new old lat)
+    (cond
+     [(null? lat) '()]
+     [(eq? old (car lat)) (cons new
+                                (multisubst new old (cdr lat)))]
+     [else (cons (car lat)
+                 (multisubst new old (cdr lat)))])))
+
+(multisubst 'j 'b '(a b c b a b))
+#+END_SRC
+** 第四章 数字游戏
+
+#+BEGIN_SRC scheme
+;; (define add1
+;;   (lambda (n)
+;;     (+ n 1)))
+
+;; (define sub1
+;;   (lambda (n)
+;;     (- n 1)))
+
+(define plus
+  (lambda (n m)
+    (cond
+     [(zero? n) m]
+     [else
+      (plus (sub1 n) (add1 m))])))
+(plus 4 5)
+#+END_SRC
+
+#+RESULTS:
+: 9
+
+
+#+BEGIN_SRC scheme
+;; (define add1
+;;   (lambda (n)
+;;     (+ n 1)))
+
+;; (define sub1
+;;   (lambda (n)
+;;     (- n 1)))
+
+(define minus
+  (lambda (n m)
+    (cond
+     [(zero? m) n]
+     [else
+      (sub1 (minus n (sub1 m)))])))
+(minus 9 5)
+#+END_SRC
+
+#+RESULTS:
+: 4
+
+
+#+BEGIN_SRC scheme
+(define addtup
+  (lambda (tup)
+    (cond
+     [(null? tup) 0]
+     [else (+ (car tup) (addtup (cdr tup)))])))
+
+(addtup '(1 2 3 4 5 6 7 8 9))
+#+END_SRC
+
+#+RESULTS:
+: 45
+
+
+#+BEGIN_SRC scheme
+(define mul
+  (lambda (n m)
+    (cond
+     [(zero? m) 0]
+     [else (+ n (mul n (sub1 m)))])))
+
+(mul 5 9)
+#+END_SRC
+
+#+RESULTS:
+: 45
+
+
+#+BEGIN_SRC scheme
+;; Simple version: assume two tups have same length
+;; (define tup+
+;;   (lambda (tup1 tup2)
+;;     (cond
+;;      [(and (null? tup1) (null? tup2)) '()]
+;;      [else (cons (+ (car tup1) (car tup2))
+;;                  (tup+ (cdr tup1) (cdr tup2)))])))
+
+(define tup+
+  (lambda (tup1 tup2)
+    (cond
+     [(and (null? tup1) (null? tup2)) '()]
+     [(null? tup1) tup2]
+     [(null? tup2) tup1]
+     [else (cons (+ (car tup1) (car tup2))
+                 (tup+ (cdr tup1) (cdr tup2)))])))
+
+(tup+ '(1 3 5 7 9) '(2 4 6 8 10 12))
+#+END_SRC
+
+#+RESULTS:
+| 3 | 7 | 11 | 15 | 19 | 12 |
+
+
+#+BEGIN_SRC scheme
+(define gt
+  (lambda (n m)
+    (cond
+     [(zero? n) #f]
+     [(zero? m) #t]
+     [else (gt (sub1 n) (sub1 m))])))
+
+(gt 9 9)
+#+END_SRC
+
+#+RESULTS:
+: #f
+
+#+BEGIN_SRC scheme
+(define lt
+  (lambda (n m)
+    (cond
+     [(zero? m) #f]
+     [(zero? n) #t]
+     [else (lt (sub1 n) (sub1 m))])))
+
+(lt 9 9)
+#+END_SRC
+
+#+RESULTS:
+: #f
+
+#+BEGIN_SRC scheme
+(define eq
+  (lambda (n m)
+    (cond
+     [(zero? n) (zero? m)]
+     [(zero? m) #f]
+     [else (eq (sub1 n) (sub1 m))])))
+
+(eq 9 8)
+#+END_SRC
+
+#+RESULTS:
+: #f
+
+
+#+BEGIN_SRC scheme
+(define ^
+  (lambda (n m)
+    (cond
+     [(zero? m) 1]
+     [else (* n
+              (^ n (sub1 m)))])))
+
+(^ 2 3)
+#+END_SRC
+
+#+RESULTS:
+: 8
+
+
+#+BEGIN_SRC scheme
+(define div
+  (lambda (n m)
+    (cond
+     [(< n m) 0]
+     [else (add1 (div (- n m) m))])))
+
+(div 6 2)
+#+END_SRC
+
+#+RESULTS:
+: 3
+
+
+#+BEGIN_SRC scheme
+(define my-length
+  (lambda (lat)
+    (cond
+     [(null? lat) 0]
+     [else (add1 (my-length (cdr lat)))])))
+
+(my-length '(1 2 3 4 5))
+#+END_SRC
+
+#+RESULTS:
+: 5
+
+
+#+BEGIN_SRC scheme
+(define pick
+  (lambda (n lat)
+    (cond
+     [(zero? (sub1 n)) (car lat)]
+     [else (pick (sub1 n) (cdr lat))])))
+
+(pick 2 '(apple pear watermelon))
+#+END_SRC
+
+#+RESULTS:
+: pear
+
+
+
+#+BEGIN_SRC scheme
+(define rempick
+  (lambda (n lat)
+    (cond
+     [(zero? (sub1 n)) (cdr lat)]
+     [else (cons (car lat)
+                 (rempick (sub1 n) (cdr lat)))])))
+
+(rempick 3 '(hotdogs with hot mustard))
+#+END_SRC
+
+#+RESULTS:
+| hotdogs | with | mustard |
+
+
+#+BEGIN_SRC scheme
+(define no-nums
+  (lambda (lat)
+    (cond
+     [(null? lat) '()]
+     [(number? (car lat)) (no-nums (cdr lat))]
+     [else (cons (car lat)
+                 (no-nums (cdr lat)))])))
+
+(no-nums '(5 pears 6 prunes 9 dates))
+#+END_SRC
+
+#+RESULTS:
+| pears | prunes | dates |
+
+
+#+BEGIN_SRC scheme
+(define all-nums
+  (lambda (lat)
+    (cond
+     [(null? lat) '()]
+     [(number? (car lat)) (cons (car lat)
+                                (all-nums (cdr lat)))]
+     [else (all-nums (cdr lat))])))
+
+(all-nums '(5 pears 6 prunes 9 dates))
+#+END_SRC
+
+#+RESULTS:
+| 5 | 6 | 9 |
+
+
+#+BEGIN_SRC scheme
+(define eqan?
+  (lambda (a1 a2)
+    (cond
+     [(and (number? a1) (number? a2)) (= a1 a2)]
+     [(or (number? a1) (number? a2)) #f]
+     [else (eq? a1 a2)])))
+
+(eqan? 'a 'a)
+#+END_SRC
+
+#+RESULTS:
+: #t
+
+
+#+BEGIN_SRC scheme
+(define occur
+  (lambda (a lat)
+    (cond
+     [(null? lat) 0]
+     [(eq? a (car lat)) (add1 (occur a (cdr lat)))]
+     [else (occur a (cdr lat))])))
+
+(occur 'a '(a b c b a c d))
+#+END_SRC
+
+#+RESULTS:
+: 2
+
+
+#+BEGIN_SRC scheme
+(define one?
+  (lambda (n)
+    (zero? (sub1 n))))
+
+(one? 1)
+#+END_SRC
+
+#+RESULTS:
+: #t
+
+
+#+BEGIN_SRC scheme
+(define one?
+  (lambda (n)
+    (= n 1)))
+
+(define rempick
+  (lambda (n lat)
+    (cond
+     [(one? n) (cdr lat)]
+     [else (cons (car lat)
+                 (rempick (sub1 n) (cdr lat)))])))
+(rempick 3 '(lemon merigue salty pie))
+#+END_SRC
+
+#+RESULTS:
+| lemon | merigue | pie |
+
+** 第五章 我的天！都是星星
+#+BEGIN_SRC scheme
+(define atom?
+  (lambda (x)
+    (and (not (pair? x)) (not (null? x)))))
+(atom? 'a)
+
+(define rember*
+  (lambda (a l)
+    (cond
+     [(null? l) '()]
+     [(atom? (car l)) (cond
+                       [(eq? a (car l)) (rember* a (cdr l))]
+                       [else (cons (car l)
+                                   (rember* a (cdr l)))])]
+     [else (cons (rember* a (car l))
+                 (rember* a (cdr l)))])))
+
+(rember* 'cup '((coffee) cup ((tea) cup) (and (hick)) cup))
+#+END_SRC
+
+#+RESULTS:
+| coffee |        |
+| (tea)  |        |
+| and    | (hick) |
+
+
+#+BEGIN_SRC scheme
+(define atom?
+  (lambda (x)
+    (and (not (pair? x)) (not (null? x)))))
+(atom? 'a)
+
+(define insertR*
+  (lambda (new old l)
+    (cond
+     [(null? l) '()]
+     [(atom? (car l)) (cond
+                       [(eq? old (car l)) (cons old
+                                                (cons new
+                                                      (insertR* new old (cdr l))))]
+                       [else (cons (car l) (insertR* new old (cdr l)))])]
+      [else (cons (insertR* new old (car l))
+                  (insertR* new old (cdr l)))])))
+
+(insertR* 'roast 'chuck '((how much (wood)) could ((a (wood) chuck)) (((chuck))) (if (a) ((wood chuck))) could chuck wood))
+#+END_SRC
+
+#+RESULTS:
+| (how much (wood)) | could | ((a (wood) chuck roast)) | (((chuck roast))) | (if (a) ((wood chuck roast))) | could | chuck | roast | wood |
+
+
+#+BEGIN_SRC scheme
+(define atom?
+  (lambda (x)
+    (and (not (pair? x)) (not (null? x)))))
+(atom? 'a)
+
+(define occur*
+  (lambda (a l)
+    (cond
+     [(null? l) 0]
+     [(atom? (car l)) (cond
+                       [(eq? a (car l)) (add1 (occur* a (cdr l)))]
+                       [else (occur* a (cdr l))])]
+     [else (+ (occur* a (car l))
+              (occur* a (cdr l)))])))
+
+(occur* 'banana '((banana) (split ((((banana ice))) (cream (banana)) sherbet)) (banana) (bread) (banana bready)))
+#+END_SRC
+
+#+RESULTS:
+: 5
+
+#+BEGIN_SRC scheme
+(define atom?
+  (lambda (x)
+    (and (not (pair? x)) (not (null? x)))))
+(atom? 'a)
+
+(define subst*
+  (lambda (new old l)
+    (cond
+     [(null? l) '()]
+     [(atom? (car l)) (cond
+                       [(eq? old (car l)) (cons new
+                                                (subst* new old (cdr l)))]
+                       [else (cons (car l) (subst* new old (cdr l)))])]
+     [else (cons (subst* new old (car l))
+                 (subst* new old (cdr l)))])))
+
+(subst* 'orange 'banana' '((banana) (split ((((banana ice))) (cream (banana)) sherbet)) (banana) (bread) (banana breandy)))
+#+END_SRC
+
+#+RESULTS:
+| quote | ((orange) (split ((((orange ice))) (cream (orange)) sherbet)) (orange) (bread) (orange breandy)) |
+
+
+#+BEGIN_SRC scheme
+(define atom?
+  (lambda (x)
+    (and (not (pair? x)) (not (null? x)))))
+(atom? 'a)
+
+(define insertL*
+  (lambda (new old l)
+    (cond
+     [(null? l) '()]
+     [(atom? (car l)) (cond
+                       [(eq? old (car l)) (cons new
+                                                (cons old
+                                                      (insertL* new old (cdr l))))]
+                       [else (cons (car l)
+                                   (insertL* new old (cdr l)))])]
+     [else (cons (insertL* new old (car l))
+                 (insertL* new old (cdr l)))])))
+
+(insertL* 'pecker 'chuck '((how much (wood)) could ((a (woold) chuck)) (((chuck))) (if (a) ((wood chuck))) could chuck wood))
+#+END_SRC
+
+#+RESULTS:
+| (how much (wood)) | could | ((a (woold) pecker chuck)) | (((pecker chuck))) | (if (a) ((wood pecker chuck))) | could | pecker | chuck | wood |
+
+#+BEGIN_SRC scheme
+(define atom?
+  (lambda (x)
+    (and (not (pair? x)) (not (null? x)))))
+(atom? 'a)
+
+(define member*
+  (lambda (a l)
+    (cond
+     [(null? l) #f]
+     [(atom? (car l)) (cond
+                       [(eq? a (car l)) #t]
+                       [else (member* a (cdr l))])]
+     [else (or (member* a (car l))
+               (member* a (cdr l)))])))
+
+(member* 'chips '((potato) (chips ((with) fishi) (chips))))
+#+END_SRC
+
+#+RESULTS:
+: #t
+
+#+BEGIN_SRC scheme
+(define atom?
+  (lambda (x)
+    (and (not (pair? x)) (not (null? x)))))
+(atom? 'a)
+
+(define leftmost
+  (lambda (l)
+    (cond
+     [(null? l) #f]
+     [(atom? (car l)) (car l)]
+     [(leftmost (car l))])))
+
+(leftmost '((potato) (chips ((with) fishi) (chips))))
+#+END_SRC
+
+#+RESULTS:
+: potato
+
+#+BEGIN_SRC scheme
+(define atom?
+  (lambda (x)
+    (and (not (pair? x)) (not (null? x)))))
+(atom? 'a)
+
+(define eqan?
+  (lambda (a1 a2)
+    (cond
+     [(and (number? a1) (number? a2)) (= a1 a2)]
+     [(or (number? a1) (number? a2)) #f]
+     [else (eq? a1 a2)])))
+
+(define eqlist?
+  (lambda (l1 l2)
+    (cond
+     [(and (null? l1) (null? l2)) #t]
+     [(and (null? l1) (atom? (car l2))) #f]
+     [(null? l1) #f]
+     [(and (atom? (car l1)) (null? l2)) #f]
+     [(and (atom? (car l1)) (atom? (car l2))) (and (eqan? (car l1)
+                                                          (car l2))
+                                                   (eqlist? (cdr l1)
+                                                            (cdr l2)))]
+     [(atom? (car l1)) #f]
+     [(null? l2) #f]
+     [(atom? (car l2)) #f]
+     [else (and (eqlist? (car l1)
+                         (car l2))
+                (eqlist? (cdr l1)
+                         (cdr l2)))])))
+
+(eqlist? '(a (b (c) d)) '(a (b (c) d)))
+#+END_SRC
+
+#+RESULTS:
+: #t
+
+#+BEGIN_SRC scheme
+(define atom?
+  (lambda (x)
+    (and (not (pair? x)) (not (null? x)))))
+(atom? 'a)
+
+(define eqan?
+  (lambda (a1 a2)
+    (cond
+     [(and (number? a1) (number? a2)) (= a1 a2)]
+     [(or (number? a1) (number? a2)) #f]
+     [else (eq? a1 a2)])))
+
+(define eqlist?
+  (lambda (l1 l2)
+    (cond
+     [(and (null? l1) (null? l2)) #t]
+     [(or (null? l1) (null? l2)) #f]
+     [(and (atom? (car l1))
+           (atom? (car l2))) (and (eqan? (car l1) (car l2))
+                                  (eqlist? (cdr l1) (cdr l2)))]
+     [(or (atom? (car l1))
+          (atom? (car l2))) #f]
+     [else (and (eqlist? (car l1)
+                         (car l2))
+                (eqlist? (cdr l1)
+                         (cdr l2)))])))
+
+(define equal?
+  (lambda (s1 s2)
+    (cond
+     [(and (atom? s1) (atom? s2)) (eqan? s1 s2)]
+     [(atom? s1) #f]
+     [(atom? s2) #f]
+     [else (eqlist? s1 s2)])))
+
+(eqlist? '(a (b (c) d)) '(a (b (c) d)))
+#+END_SRC
+
+#+RESULTS:
+: #t
+
+#+BEGIN_SRC scheme
+(define atom?
+  (lambda (x)
+    (and (not (pair? x)) (not (null? x)))))
+(atom? 'a)
+
+(define eqan?
+  (lambda (a1 a2)
+    (cond
+     [(and (number? a1) (number? a2)) (= a1 a2)]
+     [(or (number? a1) (number? a2)) #f]
+     [else (eq? a1 a2)])))
+
+(define equal?
+  (lambda (s1 s2)
+    (cond
+     [(and (atom? s1) (atom? s2)) (eqan? s1 s2)]
+     [(atom? s1) #f]
+     [(atom? s2) #f]
+     [else (eqlist? s1 s2)])))
+
+(define eqlist?
+  (lambda (l1 l2)
+    (cond
+     [(and (null? l1) (null? l2)) #t]
+     [(or (null? (car l1))
+          (null? (car l2))) #f]
+     [else
+      (and (equal? (car l1)
+                    (car l2))
+           (eqlist? (cdr l1)
+                    (cdr l2)))])))
+
+(eqlist? '(a (b (c) d)) '(a (b (c) d)))
+
+(define rember
+  (lambda (s l)
+    (cond
+     [(null? l) '()]
+     [(equal? (car l) s) (cdr l)]
+     [else
+      (cons (car l)
+            (rember s (cdr l)))])))
+#+END_SRC
+
+#+RESULTS:
+: #t
+
+** 第六章 如影随行
